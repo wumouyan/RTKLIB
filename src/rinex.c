@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rinex.c : rinex functions
 *
-*          Copyright (C) 2007-2014 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2019 by T.TAKASU, All rights reserved.
 *
 * reference :
 *     [1] W.Gurtner and L.Estey, RINEX The Receiver Independent Exchange Format
@@ -20,6 +20,10 @@
 *         International GNSS Service (IGS), RINEX Working Group and Radio
 *         Technical Commission for Maritime Services Special Committee 104
 *         (RTCM-SC104), December 10, 2012
+*     [8] RINEX The Receiver Independent Exchange Format Version 3.03,
+*         International GNSS Service (IGS), RINEX Working Group and Radio
+*         Technical Commission for Maritime Services Special Committee 104
+*         (RTCM-SC104), July 14, 2015
 *
 * version : $Revision:$
 * history : 2006/01/16 1.0  new
@@ -85,10 +89,12 @@
 *                           support IRNSS
 *           2016/09/17 1.26 fix bug on fit interval in QZSS RINEX nav
 *                           URA output value complient to RINEX 3.03
+*           2016/10/10 1.27 add api outrnxinavh()
+*           2018/10/10 1.28 support galileo sisa value for rinex nav output
+*                           fix bug on handling beidou B1 code in rinex 3.03
+*           2019/08/19 1.29 support galileo sisa index for rinex nav input
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
-
-static const char rcsid[]="$Id:$";
 
 /* constants/macros ----------------------------------------------------------*/
 
@@ -192,6 +198,24 @@ static int uraindex(double value)
     int i;
     for (i=0;i<15;i++) if (ura_eph[i]>=value) break;
     return i;
+}
+/* galileo sisa index to sisa nominal value (m) ------------------------------*/
+static double sisa_value(int sisa)
+{
+    if (sisa<= 49) return sisa*0.01;
+    if (sisa<= 74) return 0.5+(sisa- 50)*0.02;
+    if (sisa<= 99) return 1.0+(sisa- 75)*0.04;
+    if (sisa<=125) return 2.0+(sisa-100)*0.16;
+    return -1.0; /* unknown or NAPA */
+}
+/* galileo sisa value (m) to sisa index --------------------------------------*/
+static int sisa_index(double value)
+{
+    if (value<0.0 || value>6.0) return 255; /* unknown or NAPA */
+    else if (value<=0.5) return (int)(value/0.01);
+    else if (value<=1.0) return (int)((value-0.5)/0.02)+50;
+    else if (value<=2.0) return (int)((value-1.0)/0.04)+75;
+    return ((int)(value-2.0)/0.16)+100;
 }
 /* initialize station parameter ----------------------------------------------*/
 static void init_sta(sta_t *sta)
@@ -376,8 +400,8 @@ static void decode_obsh(FILE *fp, char *buff, double ver, int *tsys,
         }
         *tobs[i][nt]='\0';
         
-        /* change beidou B1 code: 3.02 draft -> 3.02/3.03 */
-        if (i==5) {
+        /* change beidou B1 code: 3.02 */
+        if (i==5&&fabs(ver-3.02)<1e-3) {
             for (j=0;j<nt;j++) if (tobs[i][j][1]=='2') tobs[i][j][1]='1';
         }
         /* if unknown code in ver.3, set default code */
@@ -593,7 +617,7 @@ static int readrnxh(FILE *fp, double *ver, char *type, int *sys, int *tsys,
     
     trace(3,"readrnxh:\n");
     
-    *ver=2.10; *type=' '; *sys=SYS_GPS; *tsys=TSYS_GPS;
+    *ver=2.10; *type=' '; *sys=SYS_GPS;
     
     while (fgets(buff,MAXRNXLEN,fp)) {
         
@@ -816,7 +840,7 @@ static void saveslips(unsigned char slips[][NFREQ], obsd_t *data)
 {
     int i;
     for (i=0;i<NFREQ;i++) {
-        if (data->LLI[i]&1) slips[data->sat-1][i]|=1;
+        if (data->LLI[i]&1) slips[data->sat-1][i]|=LLI_SLIP;
     }
 }
 /* restore slips -------------------------------------------------------------*/
@@ -824,7 +848,7 @@ static void restslips(unsigned char slips[][NFREQ], obsd_t *data)
 {
     int i;
     for (i=0;i<NFREQ;i++) {
-        if (slips[data->sat-1][i]&1) data->LLI[i]|=1;
+        if (slips[data->sat-1][i]&1) data->LLI[i]|=LLI_SLIP;
         slips[data->sat-1][i]=0;
     }
 }
@@ -945,8 +969,9 @@ static void set_index(double ver, int sys, const char *opt,
 #endif
 }
 /* read rinex obs data body --------------------------------------------------*/
-static int readrnxobsb(FILE *fp, const char *opt, double ver,
-                       char tobs[][MAXOBSTYPE][4], int *flag, obsd_t *data)
+static int readrnxobsb(FILE *fp, const char *opt, double ver, int *tsys,
+                       char tobs[][MAXOBSTYPE][4], int *flag, obsd_t *data,
+                       sta_t *sta)
 {
     gtime_t time={0};
     sigind_t index[7]={{0}};
@@ -982,14 +1007,19 @@ static int readrnxobsb(FILE *fp, const char *opt, double ver,
             /* decode obs data */
             if (decode_obsdata(fp,buff,ver,mask,index,data+n)&&n<MAXOBS) n++;
         }
+        else if (*flag==3||*flag==4) { /* new site or header info follows */
+            
+            /* decode obs header */
+            decode_obsh(fp,buff,ver,tsys,tobs,NULL,sta);
+        }
         if (++i>nsat) return n;
     }
     return -1;
 }
 /* read rinex obs ------------------------------------------------------------*/
 static int readrnxobs(FILE *fp, gtime_t ts, gtime_t te, double tint,
-                      const char *opt, int rcv, double ver, int tsys,
-                      char tobs[][MAXOBSTYPE][4], obs_t *obs)
+                      const char *opt, int rcv, double ver, int *tsys,
+                      char tobs[][MAXOBSTYPE][4], obs_t *obs, sta_t *sta)
 {
     obsd_t *data;
     unsigned char slips[MAXSAT][NFREQ]={{0}};
@@ -1002,12 +1032,12 @@ static int readrnxobs(FILE *fp, gtime_t ts, gtime_t te, double tint,
     if (!(data=(obsd_t *)malloc(sizeof(obsd_t)*MAXOBS))) return 0;
     
     /* read rinex obs data body */
-    while ((n=readrnxobsb(fp,opt,ver,tobs,&flag,data))>=0&&stat>=0) {
+    while ((n=readrnxobsb(fp,opt,ver,tsys,tobs,&flag,data,sta))>=0&&stat>=0) {
         
         for (i=0;i<n;i++) {
             
             /* utc -> gpst */
-            if (tsys==TSYS_UTC) data[i].time=utc2gpst(data[i].time);
+            if (*tsys==TSYS_UTC) data[i].time=utc2gpst(data[i].time);
             
             /* save cycle-slip */
             saveslips(slips,data+i);
@@ -1102,7 +1132,7 @@ static int decode_eph(double ver, int sat, gtime_t toc, const double *data,
                                       /* bit   4-5: E5a HS */
                                       /* bit     6: E5b DVS */
                                       /* bit   7-8: E5b HS */
-        eph->sva =uraindex(data[23]); /* ura (m->index) */
+        eph->sva =sisa_index(data[23]); /* sisa (m->index) */
         
         eph->tgd[0]=   data[25];      /* BGD E5a/E1 */
         eph->tgd[1]=   data[26];      /* BGD E5b/E1 */
@@ -1440,7 +1470,7 @@ static int readrnxfp(FILE *fp, gtime_t ts, gtime_t te, double tint,
                      obs_t *obs, nav_t *nav, sta_t *sta)
 {
     double ver;
-    int sys,tsys;
+    int sys,tsys=TSYS_GPS;
     char tobs[NUMSYS][MAXOBSTYPE][4]={{""}};
     
     trace(3,"readrnxfp: flag=%d index=%d\n",flag,index);
@@ -1453,7 +1483,8 @@ static int readrnxfp(FILE *fp, gtime_t ts, gtime_t te, double tint,
     
     /* read rinex body */
     switch (*type) {
-        case 'O': return readrnxobs(fp,ts,te,tint,opt,index,ver,tsys,tobs,obs);
+        case 'O': return readrnxobs(fp,ts,te,tint,opt,index,ver,&tsys,tobs,obs,
+                                    sta);
         case 'N': return readrnxnav(fp,opt,ver,sys    ,nav);
         case 'G': return readrnxnav(fp,opt,ver,SYS_GLO,nav);
         case 'H': return readrnxnav(fp,opt,ver,SYS_SBS,nav);
@@ -1633,7 +1664,8 @@ extern int readrnxc(const char *file, nav_t *nav)
     
     for (i=0;i<MAXEXFILE;i++) {
         if (!(files[i]=(char *)malloc(1024))) {
-            for (i--;i>=0;i--) free(files[i]); return 0;
+            for (i--;i>=0;i--) free(files[i]);
+            return 0;
         }
     }
     /* expand wild-card */
@@ -1769,8 +1801,8 @@ extern int input_rnxctr(rnxctr_t *rnx, FILE *fp)
     
     /* read rinex obs data */
     if (rnx->type=='O') {
-        if ((n=readrnxobsb(fp,rnx->opt,rnx->ver,rnx->tobs,&flag,
-                           rnx->obs.data))<=0) {
+        if ((n=readrnxobsb(fp,rnx->opt,rnx->ver,&rnx->tsys,rnx->tobs,&flag,
+                           rnx->obs.data,&rnx->sta))<=0) {
             rnx->obs.n=0;
             return n<0?-2:0;
         }
@@ -1838,6 +1870,7 @@ static void outobstype_ver2(FILE *fp, const rnxopt_t *opt)
 static void outobstype_ver3(FILE *fp, const rnxopt_t *opt)
 {
     const char label[]="SYS / # / OBS TYPES";
+    char tobs[8];
     int i,j;
     
     trace(3,"outobstype_ver3:\n");
@@ -1850,7 +1883,14 @@ static void outobstype_ver3(FILE *fp, const rnxopt_t *opt)
         for (j=0;j<opt->nobs[i];j++) {
             if (j>0&&j%13==0) fprintf(fp,"      ");
             
-            fprintf(fp," %3s",opt->tobs[i][j]);
+            strcpy(tobs,opt->tobs[i][j]);
+            
+            /* beidou B1x -> 1x (3.02), 2x (other) */
+            if (navsys[i]==SYS_CMP) {
+                if (opt->rnxver==3.02&&tobs[1]=='2') tobs[1]='1';
+                if (opt->rnxver!=3.02&&tobs[1]=='1') tobs[1]='2';
+            }
+            fprintf(fp," %3s", tobs);
             
             if (j%13==12) fprintf(fp,"  %-20s\n",label);
         }
@@ -1969,9 +2009,18 @@ extern int outrnxobsh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
 /* output obs data field -----------------------------------------------------*/
 static void outrnxobsf(FILE *fp, double obs, int lli)
 {
-    if (obs==0.0||obs<=-1E9||obs>=1E9) fprintf(fp,"              ");
-    else fprintf(fp,"%14.3f",obs);
-    if (lli<=0) fprintf(fp,"  "); else fprintf(fp,"%1.1d ",lli);
+    if (obs==0.0||obs<=-1E9||obs>=1E9) {
+        fprintf(fp,"              ");
+    }
+    else {
+        fprintf(fp,"%14.3f",obs);
+    }
+    if (lli<0||!(lli&(LLI_SLIP|LLI_HALFC|LLI_BOCTRK))) {
+        fprintf(fp,"  ");
+    }
+    else {
+        fprintf(fp,"%1.1d ",lli&(LLI_SLIP|LLI_HALFC|LLI_BOCTRK));
+    }
 }
 /* search obs data index -----------------------------------------------------*/
 static int obsindex(double ver, int sys, const unsigned char *code,
@@ -2337,7 +2386,12 @@ extern int outrnxnavb(FILE *fp, const rnxopt_t *opt, const eph_t *eph)
     outnavf(fp,eph->flag   );
     fprintf(fp,"\n%s",sep  );
     
-    outnavf(fp,uravalue(eph->sva));
+    if (sys==SYS_GAL) {
+        outnavf(fp,sisa_value(eph->sva));
+    }
+    else {
+        outnavf(fp,uravalue(eph->sva));
+    }
     outnavf(fp,eph->svh    );
     outnavf(fp,eph->tgd[0] ); /* GPS/QZS:TGD, GAL:BGD E5a/E1, BDS: TGD1 B1/B3 */
     if (sys==SYS_GAL||sys==SYS_CMP) {
@@ -2623,6 +2677,34 @@ extern int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
     
     fprintf(fp,"%9.2f           %-20s%-20s%-20s\n",opt->rnxver,
             "N: GNSS NAV DATA","C: BeiDou","RINEX VERSION / TYPE");
+    
+    fprintf(fp,"%-20.20s%-20.20s%-20.20s%-20s\n",opt->prog,opt->runby,date,
+            "PGM / RUN BY / DATE");
+    
+    for (i=0;i<MAXCOMMENT;i++) {
+        if (!*opt->comment[i]) continue;
+        fprintf(fp,"%-60.60s%-20s\n",opt->comment[i],"COMMENT");
+    }
+    return fprintf(fp,"%60s%-20s\n","","END OF HEADER")!=EOF;
+}
+/* output rinex irnss nav header -----------------------------------------------
+* output rinex irnss nav file header (2.12 extention and 3.02)
+* args   : FILE   *fp       I   output file pointer
+*          rnxopt_t *opt    I   rinex options
+*          nav_t  nav       I   navigation data (NULL: no input)
+* return : status (1:ok, 0:output error)
+*-----------------------------------------------------------------------------*/
+extern int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav)
+{
+    int i;
+    char date[64];
+    
+    trace(3,"outrnxinavh:\n");
+    
+    timestr_rnx(date);
+    
+    fprintf(fp,"%9.2f           %-20s%-20s%-20s\n",opt->rnxver,
+            "N: GNSS NAV DATA","I: IRNSS","RINEX VERSION / TYPE");
     
     fprintf(fp,"%-20.20s%-20.20s%-20.20s%-20s\n",opt->prog,opt->runby,date,
             "PGM / RUN BY / DATE");

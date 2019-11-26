@@ -13,5 +13,6 @@
     <Transaction>2016/08/20 15:55:50.000.950,D:\proj\RTKLIB\lib\omf\mkl_lapack_omf.lib=</Transaction>
     <Transaction>2016/08/20 15:55:51.000.033,D:\proj\RTKLIB\lib\omf\mkl_p4p_omf.lib=</Transaction>
     <Transaction>2016/08/20 15:57:14.000.348,D:\proj\RTKLIB\app\rtknavi_win64\rtknavi_mkl.cbproj=D:\proj\RTKLIB\app\rtknavi_win64\rtknavi_win64.cbproj</Transaction>
+    <Transaction>2017/05/26 21:09:51.000.323,=D:\proj\RTKLIB\src\rcv\tersus.c</Transaction>
   </Transactions>
 </BorlandProject>

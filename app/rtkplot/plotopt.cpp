@@ -90,8 +90,11 @@ void __fastcall TPlotOptDialog::FormShow(TObject *Sender)
     ElMaskP->ItemIndex=Plot->ElMaskP;
     ExSats->Text=Plot->ExSats;
     BuffSize->Text=s.sprintf("%d",Plot->RtBuffSize);
+    ChkTimeSync->Checked=Plot->TimeSyncOut;
+    EditTimeSync->Text=s.sprintf("%d",Plot->TimeSyncPort);
     QcCmd  ->Text=Plot->QcCmd;
     RnxOpts->Text=Plot->RnxOpts;
+    ApiKey ->Text=Plot->ApiKey;
     TLEFile->Text=Plot->TLEFile;
     TLESatFile->Text=Plot->TLESatFile;
     
@@ -157,9 +160,12 @@ void __fastcall TPlotOptDialog::BtnOKClick(TObject *Sender)
     Plot->HideLowSat=HideLowSat->ItemIndex;
     Plot->ElMaskP=ElMaskP->ItemIndex;
     Plot->RtBuffSize=(int)str2dbl(BuffSize->Text);
+    Plot->TimeSyncOut=ChkTimeSync->Checked;
+    Plot->TimeSyncPort=EditTimeSync->Text.ToInt();
     Plot->ExSats=ExSats->Text;
     Plot->QcCmd =QcCmd->Text;
     Plot->RnxOpts=RnxOpts->Text;
+    Plot->ApiKey=ApiKey->Text;
     Plot->TLEFile=TLEFile->Text;
     Plot->TLESatFile=TLESatFile->Text;
 }
@@ -268,6 +274,7 @@ void __fastcall TPlotOptDialog::UpdateEnable(void)
     RefPos3    ->Enabled=Origin->ItemIndex==5||RcvPos->ItemIndex==1;
     LabelRefPos->Enabled=Origin->ItemIndex==5||Origin->ItemIndex==6||RcvPos->ItemIndex==1;
     BtnRefPos  ->Enabled=Origin->ItemIndex==5||Origin->ItemIndex==6||RcvPos->ItemIndex==1;
+    EditTimeSync->Enabled=ChkTimeSync->Checked;
 }
 //---------------------------------------------------------------------------
 void __fastcall TPlotOptDialog::RcvPosChange(TObject *Sender)
@@ -297,6 +304,11 @@ void __fastcall TPlotOptDialog::BtnTLESatViewClick(TObject *Sender)
     viewer->Caption=file;
     viewer->Show();
     viewer->Read(file);
+}
+//---------------------------------------------------------------------------
+void __fastcall TPlotOptDialog::ChkTimeSyncClick(TObject *Sender)
+{
+    UpdateEnable();
 }
 //---------------------------------------------------------------------------
 

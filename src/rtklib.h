@@ -1,7 +1,7 @@
 /*------------------------------------------------------------------------------
 * rtklib.h : rtklib constants, types and function prototypes
 *
-*          Copyright (C) 2007-2016 by T.TAKASU, All rights reserved.
+*          Copyright (C) 2007-2019 by T.TAKASU, All rights reserved.
 *
 * options : -DENAGLO   enable GLONASS
 *           -DENAGAL   enable Galileo
@@ -58,10 +58,10 @@ extern "C" {
 
 #define VER_RTKLIB  "2.4.3"             /* library version */
 
-#define PATCH_LEVEL "b26"               /* patch level */
+#define PATCH_LEVEL "b33"               /* patch level */
 
 #define COPYRIGHT_RTKLIB \
-            "Copyright (C) 2007-2016 T.Takasu\nAll rights reserved."
+            "Copyright (C) 2007-2019 T.Takasu\nAll rights reserved."
 
 #define PI          3.1415926535897932  /* pi */
 #define D2R         (PI/180.0)          /* deg to rad */
@@ -150,7 +150,7 @@ extern "C" {
 #endif
 #ifdef ENAGAL
 #define MINPRNGAL   1                   /* min satellite PRN number of Galileo */
-#define MAXPRNGAL   30                  /* max satellite PRN number of Galileo */
+#define MAXPRNGAL   36                  /* max satellite PRN number of Galileo */
 #define NSATGAL    (MAXPRNGAL-MINPRNGAL+1) /* number of Galileo satellites */
 #define NSYSGAL     1
 #else
@@ -161,9 +161,9 @@ extern "C" {
 #endif
 #ifdef ENAQZS
 #define MINPRNQZS   193                 /* min satellite PRN number of QZSS */
-#define MAXPRNQZS   199                 /* max satellite PRN number of QZSS */
+#define MAXPRNQZS   202                 /* max satellite PRN number of QZSS */
 #define MINPRNQZS_S 183                 /* min satellite PRN number of QZSS SAIF */
-#define MAXPRNQZS_S 189                 /* max satellite PRN number of QZSS SAIF */
+#define MAXPRNQZS_S 191                 /* max satellite PRN number of QZSS SAIF */
 #define NSATQZS     (MAXPRNQZS-MINPRNQZS+1) /* number of QZSS satellites */
 #define NSYSQZS     1
 #else
@@ -176,7 +176,7 @@ extern "C" {
 #endif
 #ifdef ENACMP
 #define MINPRNCMP   1                   /* min satellite sat number of BeiDou */
-#define MAXPRNCMP   35                  /* max satellite sat number of BeiDou */
+#define MAXPRNCMP   37                  /* max satellite sat number of BeiDou */
 #define NSATCMP     (MAXPRNCMP-MINPRNCMP+1) /* number of BeiDou satellites */
 #define NSYSCMP     1
 #else
@@ -222,10 +222,14 @@ extern "C" {
 #endif
 #define MAXRCV      64                  /* max receiver number (1 to MAXRCV) */
 #define MAXOBSTYPE  64                  /* max number of obs type in RINEX */
+#ifdef OBS_100HZ
 #define DTTOL       0.005               /* tolerance of time difference (s) */
+#else
+#define DTTOL       0.025               /* tolerance of time difference (s) */
+#endif
 #define MAXDTOE     7200.0              /* max time difference to GPS Toe (s) */
 #define MAXDTOE_QZS 7200.0              /* max time difference to QZSS Toe (s) */
-#define MAXDTOE_GAL 10800.0             /* max time difference to Galileo Toe (s) */
+#define MAXDTOE_GAL 14400.0             /* max time difference to Galileo Toe (s) */
 #define MAXDTOE_CMP 21600.0             /* max time difference to BeiDou Toe (s) */
 #define MAXDTOE_GLO 1800.0              /* max time difference to GLONASS Toe (s) */
 #define MAXDTOE_SBS 360.0               /* max time difference to SBAS Toe (s) */
@@ -438,16 +442,17 @@ extern "C" {
 #define STRFMT_RT17  12                 /* stream format: Trimble RT17 */
 #define STRFMT_SEPT  13                 /* stream format: Septentrio */
 #define STRFMT_CMR   14                 /* stream format: CMR/CMR+ */
-#define STRFMT_LEXR  15                 /* stream format: Furuno LPY-10000 */
-#define STRFMT_RINEX 16                 /* stream format: RINEX */
-#define STRFMT_SP3   17                 /* stream format: SP3 */
-#define STRFMT_RNXCLK 18                /* stream format: RINEX CLK */
-#define STRFMT_SBAS  19                 /* stream format: SBAS messages */
-#define STRFMT_NMEA  20                 /* stream format: NMEA 0183 */
+#define STRFMT_TERSUS 15                /* stream format: TERSUS */
+#define STRFMT_LEXR  16                 /* stream format: Furuno LPY-10000 */
+#define STRFMT_RINEX 17                 /* stream format: RINEX */
+#define STRFMT_SP3   18                 /* stream format: SP3 */
+#define STRFMT_RNXCLK 19                /* stream format: RINEX CLK */
+#define STRFMT_SBAS  20                 /* stream format: SBAS messages */
+#define STRFMT_NMEA  21                 /* stream format: NMEA 0183 */
 #ifndef EXTLEX
-#define MAXRCVFMT    14                 /* max number of receiver format */
+#define MAXRCVFMT    15                 /* max number of receiver format */
 #else
-#define MAXRCVFMT    15
+#define MAXRCVFMT    16
 #endif
 
 #define STR_MODE_R  0x1                 /* stream mode: read */
@@ -468,6 +473,14 @@ extern "C" {
 #define DLOPT_KEEPCMP 0x02              /* download option: keep compressed file */
 #define DLOPT_HOLDERR 0x04              /* download option: hold on error file */
 #define DLOPT_HOLDLST 0x08              /* download option: hold on listing file */
+
+#define LLI_SLIP    0x01                /* LLI: cycle-slip */
+#define LLI_HALFC   0x02                /* LLI: half-cycle not resovled */
+#define LLI_BOCTRK  0x04                /* LLI: boc tracking of mboc signal */
+#define LLI_HALFA   0x40                /* LLI: half-cycle added */
+#define LLI_HALFS   0x80                /* LLI: half-cycle subtracted */
+
+#define IMUFMT_KVH  1                   /* imu data format KVH */
 
 #define P2_5        0.03125             /* 2^-5 */
 #define P2_6        0.015625            /* 2^-6 */
@@ -579,8 +592,11 @@ typedef struct {        /* GPS/QZS/GAL broadcast ephemeris type */
     int sva;            /* SV accuracy (URA index) */
     int svh;            /* SV health (0:ok) */
     int week;           /* GPS/QZS: gps week, GAL: galileo week */
-    int code;           /* GPS/QZS: code on L2, GAL/CMP: data sources */
-    int flag;           /* GPS/QZS: L2 P data flag, CMP: nav type */
+    int code;           /* GPS/QZS: code on L2 */
+                        /* GAL: data source defined as rinex 3.03 */
+                        /* BDS: data source (0:unknown,1:B1I,2:B1Q,3:B2I,4:B2Q,5:B3I,6:B3Q) */
+    int flag;           /* GPS/QZS: L2 P data flag */
+                        /* BDS: nav type (0:unknown,1:IGSO/MEO,2:GEO) */
     gtime_t toe,toc,ttr; /* Toe,Toc,T_trans */
                         /* SV orbit parameters */
     double A,e,i0,OMG0,omg,M0,deln,OMGd,idot;
@@ -903,6 +919,7 @@ typedef struct {        /* solution type */
     float  qr[6];       /* position variance/covariance (m^2) */
                         /* {c_xx,c_yy,c_zz,c_xy,c_yz,c_zx} or */
                         /* {c_ee,c_nn,c_uu,c_en,c_nu,c_ue} */
+    float  qv[6];       /* velocity variance/covariance (m^2/s^2) */
     double dtr[6];      /* receiver clock bias to time systems (s) */
     unsigned char type; /* type (0:xyz-ecef,1:enu-baseline) */
     unsigned char stat; /* solution status (SOLQ_???) */
@@ -1085,6 +1102,7 @@ typedef struct {        /* solution options type */
     int degf;           /* latitude/longitude format (0:ddd.ddd,1:ddd mm ss) */
     int outhead;        /* output header (0:no,1:yes) */
     int outopt;         /* output processing options (0:no,1:yes) */
+    int outvel;         /* output velocity options (0:no,1:yes) */
     int datum;          /* datum (0:WGS84,1:Tokyo) */
     int height;         /* height (0:ellipsoidal,1:geodetic) */
     int geoid;          /* geoid model (0:EGM96,1:JGD2000) */
@@ -1116,6 +1134,7 @@ typedef struct {        /* file options type */
 typedef struct {        /* RINEX options type */
     gtime_t ts,te;      /* time start/end */
     double tint;        /* time interval (s) */
+    double ttol;        /* time tolerance (s) */
     double tunit;       /* time unit for multiple-session (s) */
     double rnxver;      /* RINEX version */
     int navsys;         /* navigation system */
@@ -1142,6 +1161,7 @@ typedef struct {        /* RINEX options type */
     int outleaps;       /* output leap seconds */
     int autopos;        /* auto approx position */
     int halfcyc;        /* half cycle correction */
+    int sep_nav;        /* separated nav files */
     gtime_t tstart;     /* first obs time */
     gtime_t tend;       /* last obs time */
     gtime_t trtcm;      /* approx log start time for rtcm */
@@ -1207,7 +1227,7 @@ typedef struct half_cyc_tag {  /* half-cycle correction list type */
 
 typedef struct {        /* receiver raw data control type */
     gtime_t time;       /* message time */
-    gtime_t tobs;       /* observation data time */
+    gtime_t tobs[MAXSAT][NFREQ+NEXOBS]; /* observation data time */
     obs_t obs;          /* observation data */
     obs_t obuf;         /* observation data buffer */
     nav_t nav;          /* satellite ephemerides */
@@ -1322,6 +1342,8 @@ typedef struct {        /* RTK server type */
     int nave;           /* number of averaging base pos */
     double rb_ave[3];   /* averaging base pos */
     char cmds_periodic[3][MAXRCVCMD]; /* periodic commands */
+    char cmd_reset[MAXRCVCMD]; /* reset command */
+    double bl_reset;    /* baseline length to reset (km) */
     lock_t lock;        /* lock flag */
 } rtksvr_t;
 
@@ -1354,6 +1376,21 @@ typedef struct {        /* gis type */
     double bound[4];    /* boundary {lat0,lat1,lon0,lon1} */
 } gis_t;
 
+typedef struct {        /* imu data type */
+    gtime_t time;       /* time */
+    int stat;           /* status */
+    int seqno;          /* sequence number */
+    float temp;         /* temperature (C) */
+    double rot[3];      /* rotation rate {x,y,z} (rad/s) */
+    double acc[3];      /* acceleration data {x,y,z} (m/s^2) */
+} imud_t;
+
+typedef struct {        /* imu type */
+    imud_t data;        /* imu data */
+    int nbyte;          /* bytes in imu data buffer */
+    unsigned char buff[256]; /* imu data buffer */
+} imu_t;
+
 typedef void fatalfunc_t(const char *); /* fatal callback function type */
 
 /* global variables ----------------------------------------------------------*/
@@ -1373,7 +1410,7 @@ EXPORT int  satid2no(const char *id);
 EXPORT void satno2id(int sat, char *id);
 EXPORT unsigned char obs2code(const char *obs, int *freq);
 EXPORT char *code2obs(unsigned char code, int *freq);
-EXPORT int  satexclude(int sat, int svh, const prcopt_t *opt);
+EXPORT int  satexclude(int sat, double var, int svh, const prcopt_t *opt);
 EXPORT int  testsnr(int base, int freq, double el, double snr,
                     const snrmask_t *mask);
 EXPORT void setcodepri(int sys, int freq, const char *pri);
@@ -1550,6 +1587,7 @@ EXPORT int outrnxhnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
 EXPORT int outrnxlnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
 EXPORT int outrnxqnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
 EXPORT int outrnxcnavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
+EXPORT int outrnxinavh(FILE *fp, const rnxopt_t *opt, const nav_t *nav);
 EXPORT int outrnxnavb (FILE *fp, const rnxopt_t *opt, const eph_t *eph);
 EXPORT int outrnxgnavb(FILE *fp, const rnxopt_t *opt, const geph_t *geph);
 EXPORT int outrnxhnavb(FILE *fp, const rnxopt_t *opt, const seph_t *seph);
@@ -1579,6 +1617,7 @@ EXPORT int  satpos(gtime_t time, gtime_t teph, int sat, int ephopt,
                    int *svh);
 EXPORT void satposs(gtime_t time, const obsd_t *obs, int n, const nav_t *nav,
                     int sateph, double *rs, double *dts, double *var, int *svh);
+EXPORT void satseleph(int sys, int sel);
 EXPORT void readsp3(const char *file, nav_t *nav, int opt);
 EXPORT int  readsap(const char *file, gtime_t time, nav_t *nav);
 EXPORT int  readdcb(const char *file, nav_t *nav, const sta_t *sta);
@@ -1632,6 +1671,7 @@ EXPORT int input_bnx   (raw_t *raw, unsigned char data);
 EXPORT int input_rt17  (raw_t *raw, unsigned char data);
 EXPORT int input_sbf   (raw_t *raw, unsigned char data);
 EXPORT int input_cmr   (raw_t *raw, unsigned char data);
+EXPORT int input_tersus(raw_t *raw, unsigned char data);
 EXPORT int input_lexr  (raw_t *raw, unsigned char data);
 EXPORT int input_oem4f (raw_t *raw, FILE *fp);
 EXPORT int input_oem3f (raw_t *raw, FILE *fp);
@@ -1646,6 +1686,7 @@ EXPORT int input_bnxf  (raw_t *raw, FILE *fp);
 EXPORT int input_rt17f (raw_t *raw, FILE *fp);
 EXPORT int input_sbff  (raw_t *raw, FILE *fp);
 EXPORT int input_cmrf  (raw_t *raw, FILE *fp);
+EXPORT int input_tersusf(raw_t *raw, FILE *fp);
 EXPORT int input_lexrf (raw_t *raw, FILE *fp);
 
 EXPORT int gen_ubx (const char *msg, unsigned char *buff);
@@ -1846,6 +1887,10 @@ EXPORT void dl_test(gtime_t ts, gtime_t te, double ti, const url_t *urls,
 /* gis data functions --------------------------------------------------------*/
 EXPORT int gis_read(const char *file, gis_t *gis, int layer);
 EXPORT void gis_free(gis_t *gis);
+
+/* imu functions -------------------------------------------------------------*/
+EXPORT int init_imu(imu_t *imu);
+EXPORT int input_imu(imu_t *imu, int format, unsigned char byte);
 
 /* qzss lex functions --------------------------------------------------------*/
 EXPORT int lexupdatecorr(const lexmsg_t *msg, nav_t *nav, gtime_t *tof);
